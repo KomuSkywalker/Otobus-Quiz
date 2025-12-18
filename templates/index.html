@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-BBM4MESJV5"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-BBM4MESJV5');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Otobüs Quiz</title>
+    
+    <link rel="icon" href="/static/bus-icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="/static/style.css">
+
+    <style>
+        /* Paylaş Butonu Stili */
+        .share-btn-final {
+            background-color: #25D366 !important;
+            color: white !important;
+            box-shadow: 0px 5px 0px #128C7E !important;
+            width: 90%;
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border-radius: 50px;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 20px;
+        }
+        .share-btn-final:active {
+            transform: translateY(4px);
+            box-shadow: 0px 1px 0px #128C7E !important;
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop>
+        <source src="/static/muzik.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sound-win" preload="auto">
+        <source src="/static/dogru.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sound-lose" preload="auto">
+        <source src="/static/yanlis.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="app-container">
+        
+        <div id="screen-menu" class="screen">
+            <img src="/static/bus-icon.png" alt="Logo" class="logo-ust">
+            
+            <div class="input-wrapper">
+                <input type="text" id="oyuncu-ismi" placeholder="Adını yaz bakalım..." maxlength="12">
+            </div>
+
+            <div class="btn-wrapper">
+                <button class="iett-btn btn-dev" onclick="isimKontrolVeIlerle()">OYUNA BAŞLA</button>
+                <button class="iett-btn" onclick="liderleriGoster()">Liderler Tablosu</button>
+            </div>
+
+            <div class="footer-info">
+                <div class="legal-links" style="margin-bottom: 8px; font-size: 0.85rem; font-weight: 700;">
+                    <a href="/gizlilik" style="color:#333; text-decoration:none; margin: 0 5px;">Gizlilik</a> | 
+                    <a href="/hakkimizda" style="color:#333; text-decoration:none; margin: 0 5px;">Hakkımızda</a> | 
+                    <a href="/iletisim" style="color:#333; text-decoration:none; margin: 0 5px;">İletişim</a>
+                </div>
+                <p style="font-weight: 800; margin-top: 5px;">Otobüs Quiz v2.7</p>
+                <p class="signature">Created by Cargargatagon</p>
+            </div>
+        </div>
+
+        <div id="screen-map-select" class="screen gizli">
+            <h2 class="game-logo-text">Bölge Seç</h2>
+            <div class="btn-wrapper">
+                <button class="iett-btn" onclick="oyunuBaslat('Avrupa')">Avrupa Yakası</button>
+                <button class="iett-btn" onclick="oyunuBaslat('Anadolu')">Anadolu Yakası</button>
+                <button class="iett-btn" onclick="oyunuBaslat('Karışık')">Karışık</button>
+            </div>
+            <div class="back-btn-wrapper">
+                <button class="iett-btn btn-geri" onclick="anaMenuyeDon()">Geri Dön</button>
+            </div>
+        </div>
+
+        <div id="screen-game" class="screen gizli">
+            <div class="top-bar">
+                <span id="kullanici-adi-goster"></span>
+                <span id="skor-goster">Puan: 0</span>
+            </div>
+            
+            <div style="font-size: 0.9rem; font-weight: 800; margin-bottom: 5px; color: #444;">
+                SORU: <span id="sayac-text">1</span> / 20
+            </div>
+
+            <div class="question-window">
+                <div class="dots">
+                    <div class="dot d-red"></div>
+                    <div class="dot d-yellow"></div>
+                    <div class="dot d-green"></div>
+                </div>
+                <p id="soru-metni" class="question-text">Soru Yükleniyor...</p>
+            </div>
+            <div id="secenekler" class="btn-wrapper"></div>
+        </div>
+
+        <div id="screen-result" class="screen gizli">
+            <img id="sonuc-resim" src="" class="character-img">
+            
+            <h3 id="sonuc-baslik" style="margin: 0 0 10px 0; font-size: 1.6rem; text-transform:uppercase;"></h3>
+            <p id="sonuc-detay" style="font-size: 1.1rem; margin-bottom: 25px; font-weight: 700; color:#333; line-height: 1.5;"></p>
+            
+            <div class="btn-wrapper">
+                <button class="share-btn-final" onclick="sonucuPaylas()">SONUCU PAYLAŞ</button>
+            </div>
+
+            <div class="btn-wrapper bottom-menu-btns" style="margin-top: 10px;">
+                <button class="iett-btn" onclick="anaMenuyeDon()">Ana Menü</button>
+                <button class="iett-btn" onclick="liderleriGoster()">Liderler Tablosu</button>
+            </div>
+        </div>
+
+        <div id="screen-leaderboard" class="screen gizli">
+            <h2 class="game-logo-text" style="font-size:1.5rem;">EN İYİLER</h2>
+            <div class="leaderboard-box">
+                <table id="lider-tablosu"><tr><td>Yükleniyor...</td></tr></table>
+            </div>
+            <div class="btn-wrapper" style="margin-top:15px;">
+                <button class="iett-btn" onclick="anaMenuyeDon()">Geri Dön</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let sorular = [];
+        let suankiSoruIndex = 0;
+        let dogruSayisi = 0;
+        let dogruAdedi = 0;
+        let oyuncuIsmi = "";
+        let secilenBolge = "Karışık";
+        
+        const bgMusic = document.getElementById("bg-music");
+        const soundWin = document.getElementById("sound-win");
+        const soundLose = document.getElementById("sound-lose");
+
+        function ekranGoster(id) {
+            const screens = document.querySelectorAll('.screen');
+            screens.forEach(s => s.classList.add('gizli'));
+            const target = document.getElementById(id);
+            if(target) target.classList.remove('gizli');
+        }
+
+        function muzigiBaslat() {
+            bgMusic.currentTime = 0;
+            bgMusic.volume = 0.3; 
+            bgMusic.play().catch(e => console.log("Otomatik oynatma engellendi."));
+        }
+
+        function muzigiDurdur() {
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+        }
+
+        function efektCal(tip) {
+            if(tip === 'dogru') {
+                soundWin.currentTime = 0;
+                soundWin.volume = 1.0;
+                soundWin.play();
+            } else {
+                soundLose.currentTime = 0;
+                soundLose.volume = 0.3;
+                soundLose.play();
+            }
+        }
+
+        function isimKontrolVeIlerle() {
+            const isimInput = document.getElementById('oyuncu-ismi');
+            oyuncuIsmi = isimInput.value.trim();
+            if(!oyuncuIsmi) { alert("Lütfen bir isim yaz şefim!"); return; }
+            document.getElementById('kullanici-adi-goster').innerText = "👤 " + oyuncuIsmi;
+            ekranGoster('screen-map-select');
+        }
+
+        function oyunuBaslat(bolge) {
+            secilenBolge = bolge;
+            muzigiBaslat();
+            fetch(`/api/sorular?bolge=${bolge}`)
+                .then(r => r.json())
+                .then(d => {
+                    sorular = d;
+                    if(!sorular || sorular.length === 0) { 
+                        alert("Soru bulunamadı!"); anaMenuyeDon(); return; 
+                    }
+                    suankiSoruIndex = 0; dogruSayisi = 0; dogruAdedi = 0;
+                    guncellePuan();
+                    ekranGoster('screen-game');
+                    soruYukle();
+                })
+                .catch(e => { console.error(e); alert("Bağlantı hatası!"); });
+        }
+
+        function guncellePuan() {
+            document.getElementById('skor-goster').innerText = "Puan: " + dogruSayisi;
+        }
+
+        function soruYukle() {
+            if(suankiSoruIndex >= sorular.length || suankiSoruIndex >= 20) {
+                oyunuBitir();
+                return;
+            }
+
+            document.getElementById('sayac-text').innerText = (suankiSoruIndex + 1);
+            const s = sorular[suankiSoruIndex];
+            document.getElementById('soru-metni').innerText = s.soru;
+            
+            const div = document.getElementById('secenekler');
+            div.innerHTML = '';
+            
+            let secenekler = [...s.secenekler];
+            secenekler.sort(() => Math.random() - 0.5);
+
+            secenekler.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.innerText = opt;
+                btn.className = 'iett-btn';
+                btn.onclick = () => cevapKontrol(opt, s.dogru_cevap);
+                div.appendChild(btn);
+            });
+        }
+
+        function cevapKontrol(secilen, dogru) {
+            if(secilen === dogru) {
+                dogruAdedi++;
+                dogruSayisi += 10;
+                efektCal('dogru');
+            } else {
+                // Yanlış cevapta ses yok
+            }
+            guncellePuan();
+            suankiSoruIndex++;
+            soruYukle(); 
+        }
+
+        function oyunuBitir() {
+            muzigiDurdur(); 
+
+            fetch('/api/skor-kaydet', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({isim: oyuncuIsmi, puan: dogruSayisi, bolge: secilenBolge})
+            });
+
+            const resim = document.getElementById('sonuc-resim');
+            const baslik = document.getElementById('sonuc-baslik');
+            const detay = document.getElementById('sonuc-detay');
+
+            if(dogruAdedi >= 15) {
+                resim.src = "/static/imammoglu-zafer.png";
+                baslik.style.display = "block";
+                baslik.style.color = "green";
+                efektCal('dogru'); 
+            } else {
+                resim.src = "/static/imammoglu-hata.png";
+                baslik.style.display = "none";
+                efektCal('yanlis'); 
+            }
+
+            detay.innerHTML = `20 Soruda <strong>${dogruAdedi}</strong> Doğru<br>Toplam Puan: ${dogruSayisi}`;
+            ekranGoster('screen-result');
+        }
+
+        // --- GÜNCELLENEN PAYLAŞ BUTONU ---
+        function sonucuPaylas() {
+            const metin = `Otobüs Quiz'de 20 soruda ${dogruAdedi} doğru bildim! İstanbul'un kurduyum diyorsan sen de dene: https://www.otobusquiz.com.tr`;
+            
+            if (navigator.share) {
+                navigator.share({ 
+                    title: 'Otobüs Quiz Sonucum', 
+                    text: metin, 
+                    url: 'https://www.otobusquiz.com.tr' 
+                }).catch(console.error);
+            } else {
+                navigator.clipboard.writeText(metin);
+                alert("Sonuç kopyalandı! WhatsApp'ta yapıştırabilirsin.");
+            }
+        }
+        // -------------------------
+
+        function liderleriGoster() {
+            ekranGoster('screen-leaderboard');
+            const tablo = document.getElementById('lider-tablosu');
+            tablo.innerHTML = '<tr><td>Yükleniyor...</td></tr>';
+            fetch('/api/liderlik').then(r => r.json()).then(data => {
+                let html = '<tr><th>Sıra</th><th>İsim</th><th>Mod</th><th>Puan</th></tr>';
+                data.forEach((kisi, index) => {
+                    html += `<tr><td>${index + 1}.</td><td>${kisi.isim}</td><td style="font-size:0.8rem; color:#666;">${kisi.bolge}</td><td>${kisi.puan}</td></tr>`;
+                });
+                tablo.innerHTML = html;
+            });
+        }
+
+        function anaMenuyeDon() {
+            muzigiDurdur();
+            ekranGoster('screen-menu');
+        }
+    </script>
+</body>
+</html>
