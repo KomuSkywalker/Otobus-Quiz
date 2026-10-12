@@ -272,10 +272,10 @@ function oyunuBitir(sonuc) {
 function sonucuPaylas() {
     if (!sonSonuc) return;
     const adres = location.origin;
-    const metin = `İETT Quiz'de ${sonSonuc.toplam} soruda ${sonSonuc.dogru} doğruyla ${sonSonuc.puan} puan topladım! İstanbul'un kurduyum diyorsan sen de dene:`;
+    const metin = `Otobüs Quiz'de ${sonSonuc.toplam} soruda ${sonSonuc.dogru} doğruyla ${sonSonuc.puan} puan topladım! İstanbul'un kurduyum diyorsan sen de dene:`;
 
     if (navigator.share) {
-        navigator.share({title: 'İETT Quiz Sonucum', text: metin, url: adres}).catch(() => {});
+        navigator.share({title: 'Otobüs Quiz Sonucum', text: metin, url: adres}).catch(() => {});
     } else if (navigator.clipboard) {
         navigator.clipboard.writeText(metin + " " + adres)
             .then(() => toast("Sonuç kopyalandı! WhatsApp'ta yapıştırabilirsin."))

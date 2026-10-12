@@ -55,17 +55,12 @@ body {
 
 /* --- LOGO --- */
 .logo { width: 100%; }
-.logo-otobus {
-    width: 300px; max-width: 88%;
-    display: block; margin: 0 auto 6px;
+.logo-baslik { margin: 0; line-height: 0; }
+.logo-img {
+    width: 330px; max-width: 94%; height: auto;
     animation: otobus-gel 0.7s cubic-bezier(.2,.9,.3,1.1) both;
 }
-.logo-yazi {
-    font-size: 3rem; font-weight: 900; line-height: 1;
-    margin: 0; letter-spacing: -2px;
-}
-.logo-yazi span { color: var(--btn-kirmizi); }
-.logo-alt { margin: 8px 0 0; font-size: 0.9rem; font-weight: 700; color: #444; }
+.logo-alt { margin: 12px 0 0; font-size: 0.9rem; font-weight: 700; color: #444; }
 
 @keyframes otobus-gel {
     from { transform: translateX(-60%); opacity: 0; }
@@ -370,8 +365,7 @@ tr.benim td { background: #FFF1B8; }
 /* Kısa ekranlar: süreli soruda şıklar kaydırmadan görünsün */
 @media (max-height: 640px) {
     .screen { gap: 12px; }
-    .logo-otobus { width: 220px; }
-    .logo-yazi { font-size: 2.4rem; }
+    .logo-img { width: 270px; }
     .character-img { width: 150px; }
     .question-window { padding: 30px 14px 14px; }
     .question-text { font-size: 1.05rem; min-height: 3.6em; }
