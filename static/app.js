@@ -53,6 +53,14 @@ function muzigiBaslat() {
     bgMusic.play().catch(() => console.log("Otomatik oynatma engellendi."));
 }
 
+function oyunEkraninda() {
+    return !$('screen-game').classList.contains('gizli');
+}
+
+function muzigiSurdur() {
+    if (sesAcik && oyunEkraninda() && bgMusic.paused) bgMusic.play().catch(() => {});
+}
+
 function muzigiDurdur() {
     bgMusic.pause();
     bgMusic.currentTime = 0;
@@ -90,8 +98,7 @@ function sesiDegistir() {
     sesAcik = !sesAcik;
     depo.yaz('ses', sesAcik);
     sesDugmesiniGuncelle();
-    const oyunda = !$('screen-game').classList.contains('gizli');
-    if (sesAcik && oyunda) muzigiBaslat();
+    if (sesAcik && oyunEkraninda()) muzigiBaslat();
     if (!sesAcik) muzigiDurdur();
 }
 
@@ -112,12 +119,24 @@ function anaMenuyeDon() {
 }
 
 // --- OYUN ---
+const bekle = ms => new Promise(coz => setTimeout(coz, ms));
+
 async function api(yol, govde) {
-    const r = await fetch(yol, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(govde)
-    });
+    // Ağ anlık koparsa fetch hata fırlatır (Safari'de "Load failed"); birkaç kez yeniden dene
+    let r;
+    for (let deneme = 1; ; deneme++) {
+        try {
+            r = await fetch(yol, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(govde)
+            });
+            break;
+        } catch (e) {
+            if (deneme >= 3) throw new Error("Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.");
+            await bekle(700 * deneme);
+        }
+    }
     const veri = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(veri.hata || "Bağlantı hatası!");
     return veri;
@@ -347,6 +366,16 @@ async function liderleriGoster(donem) {
 }
 
 // --- OLAYLAR ---
+// Döngü takılır da parça biterse elle başa sar
+bgMusic.addEventListener('ended', () => {
+    bgMusic.currentTime = 0;
+    muzigiSurdur();
+});
+// Telefon kilitlenince ya da sekme değişince tarayıcı müziği durdurur; dönünce devam ettir
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) muzigiSurdur();
+});
+window.addEventListener('pageshow', muzigiSurdur);
 $('isim-formu').addEventListener('submit', isimKontrolVeIlerle);
 $('ses-btn').addEventListener('click', sesiDegistir);
 $('paylas-btn').addEventListener('click', sonucuPaylas);
