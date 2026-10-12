@@ -29,15 +29,16 @@ SERI_BONUSU = 10          # Seri uzadıkça her doğru için eklenir
 MAX_SERI_BONUSU = 50
 OYUN_OMRU = 60 * 60       # Bu kadar saniyeden eski oyunlar geçersiz
 BOLGELER = ('Avrupa', 'Anadolu', 'Karışık')
-SKOR_SURUMU = 4           # Eski puanlama (doğru x 10) ile kaydedilen skorları ayırmak için
 ISTANBUL = timezone(timedelta(hours=3))
 
-# --- FIREBASE AYARI ---
-# Harita projesindeki veritabanını kullanıyoruz, skorlar /bus_scores altında.
-FIREBASE_DB_URL = os.environ.get(
-    'FIREBASE_DB_URL', 'https://map-9488e-default-rtdb.firebaseio.com/bus_scores').rstrip('/')
-# Veritabanı kuralları kilitlenirse buraya veritabanı gizli anahtarı verilir.
-FIREBASE_AUTH = os.environ.get('FIREBASE_AUTH')
+# --- SKOR VERİTABANI (Upstash Redis) ---
+# Vercel'deki Upstash bağlantısı bu ortam değişkenlerini kendisi tanımlar.
+REDIS_URL = (os.environ.get('KV_REST_API_URL') or os.environ.get('UPSTASH_REDIS_REST_URL') or '').rstrip('/')
+REDIS_TOKEN = os.environ.get('KV_REST_API_TOKEN') or os.environ.get('UPSTASH_REDIS_REST_TOKEN')
+ANAHTAR_ON_EKI = os.environ.get('SKOR_ON_EKI', 'iett')
+TABLO_BOYUTU = 20
+TUM_ZAMANLAR_SINIRI = 1000    # Tüm zamanlar listesinde tutulan en fazla skor
+HAFTALIK_OMUR = 30 * 24 * 60 * 60
 
 # --- İMZA ANAHTARI ---
 # Oyun durumu tarayıcıda imzalı bir jetonla taşınır; anahtar SECRET_KEY ortam değişkeninden gelir.
@@ -173,12 +174,26 @@ def isim_temizle(isim):
     return isim[:12] or 'Anonim'
 
 
-def firebase_url(yol=''):
-    return f"{FIREBASE_DB_URL}{yol}.json"
+def redis(*komutlar):
+    """Komutları tek istekte çalıştırır, sonuçları sırayla döndürür."""
+    if not REDIS_URL or not REDIS_TOKEN:
+        raise RuntimeError("Skor veritabanı tanımlı değil (KV_REST_API_URL / KV_REST_API_TOKEN).")
+    r = requests.post(REDIS_URL + '/pipeline', json=[list(k) for k in komutlar],
+                      headers={'Authorization': f'Bearer {REDIS_TOKEN}'}, timeout=5)
+    r.raise_for_status()
+    sonuclar = r.json()
+    for s in sonuclar:
+        if 'error' in s:
+            raise RuntimeError(s['error'])
+    return [s['result'] for s in sonuclar]
 
 
-def firebase_params():
-    return {'auth': FIREBASE_AUTH} if FIREBASE_AUTH else None
+def lider_anahtari(donem):
+    if donem == 'hafta':
+        # Haftalık tablo her pazartesi (İstanbul saatiyle) yeni anahtarla sıfırdan başlar
+        yil, hafta, _ = datetime.now(ISTANBUL).isocalendar()
+        return f"{ANAHTAR_ON_EKI}:lider:hafta:{yil}-{hafta:02d}"
+    return f"{ANAHTAR_ON_EKI}:lider:tum"
 
 
 # --- API: OYUNU BAŞLAT ---
@@ -279,20 +294,22 @@ def cevap_kontrol():
 def skor_kaydet(durum):
     if durum['p'] <= 0:
         return False
-    yeni_skor = {
+    # Oyun kimliği üyenin parçası olduğu için aynı oyun iki kez listeye giremez
+    uye = json.dumps({
+        "id": durum['g'],
         "isim": durum['n'],
         "puan": durum['p'],
         "dogru": durum['d'],
         "bolge": durum['b'],
-        "tarih": datetime.now(ISTANBUL).strftime("%Y-%m-%d %H:%M"),
-        "ts": int(time.time()),
-        "surum": SKOR_SURUMU,
-    }
+    }, ensure_ascii=False, sort_keys=True)
+    # Sıralama değeri: puan + eşitlikte önce yapanı öne alan küçük bir kesir
+    sira = str(durum['p'] + 1 - time.time() / 1e10)
+    tum, hafta = lider_anahtari('tum'), lider_anahtari('hafta')
     try:
-        # Oyun kimliği anahtar olduğu için aynı oyun iki kez kaydedilemez
-        r = requests.put(firebase_url('/' + durum['g']), json=yeni_skor,
-                         params=firebase_params(), timeout=5)
-        r.raise_for_status()
+        redis(['ZADD', tum, sira, uye],
+              ['ZREMRANGEBYRANK', tum, 0, -(TUM_ZAMANLAR_SINIRI + 1)],
+              ['ZADD', hafta, sira, uye],
+              ['EXPIRE', hafta, HAFTALIK_OMUR])
         _liderlik_onbellek.clear()
         return True
     except Exception as e:
@@ -305,55 +322,39 @@ _liderlik_onbellek = {}
 LIDERLIK_ONBELLEK_SURESI = 20
 
 
-def skorlari_getir():
-    kayit = _liderlik_onbellek.get('skorlar')
+def skorlari_getir(donem):
+    kayit = _liderlik_onbellek.get(donem)
     if kayit and time.time() - kayit[0] < LIDERLIK_ONBELLEK_SURESI:
         return kayit[1]
 
-    response = requests.get(firebase_url(), params=firebase_params(), timeout=5)
-    response.raise_for_status()
-    veriler = response.json() or {}
-    if isinstance(veriler, list):
-        veriler = dict(enumerate(veriler))
-
+    uyeler = redis(['ZRANGE', lider_anahtari(donem), 0, TABLO_BOYUTU - 1, 'REV'])[0]
     skorlar = []
-    for anahtar, v in veriler.items():
-        # Veritabanındaki her kayda güvenilmez: tipleri doğrula, eski puanlamayı ele
-        if not isinstance(v, dict) or v.get('surum') != SKOR_SURUMU:
+    for uye in uyeler:
+        try:
+            v = json.loads(uye)
+        except ValueError:
             continue
-        puan, ts = v.get('puan'), v.get('ts')
-        if type(puan) is not int or type(ts) is not int:
+        if not isinstance(v, dict) or type(v.get('puan')) is not int:
             continue
         skorlar.append({
-            "id": str(anahtar),
+            "id": str(v.get('id')),
             "isim": isim_temizle(v.get('isim')),
-            "puan": puan,
+            "puan": v['puan'],
             "dogru": v.get('dogru') if type(v.get('dogru')) is int else None,
             "bolge": v.get('bolge') if v.get('bolge') in BOLGELER else 'Karışık',
-            "ts": ts,
         })
-    # Eşit puanda önce yapan üstte
-    skorlar.sort(key=lambda s: (-s['puan'], s['ts']))
-    _liderlik_onbellek['skorlar'] = (time.time(), skorlar)
+    _liderlik_onbellek[donem] = (time.time(), skorlar)
     return skorlar
 
 
 @app.route('/api/liderlik')
 def liderlik_tablosu():
+    donem = 'hafta' if request.args.get('donem') == 'hafta' else 'tum'
     try:
-        skorlar = skorlari_getir()
+        return jsonify(skorlari_getir(donem))
     except Exception as e:
         print(f"Liderlik Hatası: {e}")
         return jsonify({"hata": "Liderlik tablosu yüklenemedi."}), 502
-
-    if request.args.get('donem') == 'hafta':
-        simdi = datetime.now(ISTANBUL)
-        pazartesi = (simdi - timedelta(days=simdi.weekday())).replace(
-            hour=0, minute=0, second=0, microsecond=0)
-        skorlar = [s for s in skorlar if s['ts'] >= pazartesi.timestamp()]
-
-    return jsonify([{k: s[k] for k in ('id', 'isim', 'puan', 'dogru', 'bolge')}
-                    for s in skorlar[:20]])
 
 
 if __name__ == '__main__':
