@@ -1,5 +1,4 @@
-Flask
-pandas
-openpyxl
-requests
+Flask>=3.0,<4
+openpyxl>=3.1,<4
+requests>=2.31,<3
 gunicorn
