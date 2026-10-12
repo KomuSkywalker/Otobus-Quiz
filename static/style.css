@@ -54,7 +54,7 @@ body {
 }
 
 /* --- LOGO --- */
-.logo { width: 100%; margin-bottom: 10px; }
+.logo { width: 100%; margin-bottom: 10px; position: relative; top: -16px; }
 .logo-baslik { margin: 0; line-height: 0; }
 .logo-img {
     width: 330px; max-width: 94%; height: auto;
